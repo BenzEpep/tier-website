@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>AntiCheat MY - Full Version</title>
+<style>
+/* --- Reset & Body --- */
+body { margin:0; font-family: 'Segoe UI', Tahoma, sans-serif; background:#0f172a; color:white; }
+.container { max-width:1000px; margin:auto; padding:20px; }
+
+/* --- Card & Form --- */
+.card { background:#1e293b; padding:20px; border-radius:10px; margin-top:15px; box-shadow:0 0 15px rgba(0,0,0,0.3);}
+input, select, textarea, button { width:100%; padding:10px; margin:5px 0; border-radius:6px; border:none; font-size:14px;}
+button { background:#ef4444; color:white; cursor:pointer; font-weight:bold; transition:0.3s;}
+button:hover { background:#dc2626; }
+
+/* --- Navigation --- */
+.nav { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; margin-bottom:10px;}
+.nav select { width:auto; padding:8px; }
+
+/* --- Badges --- */
+.badge { padding:4px 8px; border-radius:5px; font-size:12px; font-weight:bold; }
+.green { background:#16a34a; }
+.orange { background:#f59e0b; }
+.red { background:#dc2626; }
+
+/* --- Hidden --- */
+.hidden { display:none; }
+
+/* --- Table for search/filter --- */
+#reportList table { width:100%; border-collapse:collapse; }
+#reportList th, #reportList td { padding:8px; text-align:left; border-bottom:1px solid #374151; }
+#reportList th { background:#1f2937; }
+a { color:#38bdf8; text-decoration:none; }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <!-- Navigation -->
+  <div class="nav">
+    <h2>🛡️ AntiCheat MY</h2>
+    <select onchange="setLang(this.value)">
+      <option value="bm">Bahasa Melayu</option>
+      <option value="en">English</option>
+    </select>
+  </div>
+
+  <!-- LOGIN PAGE -->
+  <div id="loginPage" class="card">
+    <h3 id="loginTitle">Log Masuk</h3>
+    <input id="email" placeholder="Email">
+    <input id="password" type="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+  </div>
+
+  <!-- USER PAGE -->
+  <div id="userPage" class="hidden">
+    <div class="card">
+      <h3 id="reportTitle">Lapor Pemain</h3>
+      <input id="uid" placeholder="UID Player">
+      <input id="pname" placeholder="Player Name">
+      <select id="cheat">
+        <option>Aimbot</option>
+        <option>Wallhack</option>
+        <option>Speed Hack</option>
+        <option>Macro</option>
+        <option>Other</option>
+      </select>
+      <input id="proof" placeholder="Evidence Link (YouTube/TikTok)">
+      <button onclick="submitReport()">Submit Report</button>
+    </div>
+
+    <div class="card">
+      <h3 id="allReportsTitle">Senarai Semua Report</h3>
+      <input type="text" id="searchInput" placeholder="Search UID/Nama" onkeyup="filterReports()">
+      <div id="reportList"></div>
+    </div>
+    <button onclick="logout()" id="logoutBtn">Log Keluar</button>
+  </div>
+
+  <!-- ADMIN PAGE -->
+  <div id="adminPage" class="hidden">
+    <div class="card">
+      <h3>Admin Dashboard</h3>
+      <div>
+        <b>Total Report:</b> <span id="totalReports">0</span> |
+        <b>Confirmed Cheater:</b> <span id="totalCheater">0</span> |
+        <b>Clean:</b> <span id="totalClean">0</span>
+      </div>
+      <input type="text" id="searchAdmin" placeholder="Search UID/Nama" onkeyup="filterAdminReports()">
+      <div id="adminReports"></div>
+    </div>
+    <button onclick="logout()" id="adminLogout">Log Keluar</button>
+  </div>
+
+</div>
+
+<script>
+// ---------- USERS DEMO ----------
+let users = {
+  "admin@anticheat.my": {pass:"admin123", role:"admin"},
+  "user@anticheat.my": {pass:"user123", role:"user"},
+  "user2@anticheat.my": {pass:"user234", role:"user"}
+};
+
+// ---------- LANGUAGES ----------
+let lang = localStorage.getItem("lang") || "bm";
+const text = {
+  bm:{
+    login:"Log Masuk", report:"Lapor Pemain", allReports:"Senarai Semua Report",
+    uid:"UID Pemain", name:"Nama Pemain", cheat:"Jenis Cheat", proof:"Pautan Bukti",
+    submit:"Hantar Laporan", logout:"Log Keluar",
+    status:"Status", clean:"Bersih", suspicious:"Dalam Siasatan", confirmed:"Cheater Disahkan",
+    totalReport:"Jumlah Report", totalCheater:"Jumlah Cheater", totalClean:"Jumlah Bersih",
+    search:"Cari UID/Nama"
+  },
+  en:{
+    login:"Login", report:"Report Player", allReports:"All Reports List",
+    uid:"Player UID", name:"Player Name", cheat:"Cheat Type", proof:"Evidence Link",
+    submit:"Submit Report", logout:"Logout",
+    status:"Status", clean:"Clean", suspicious:"Under Investigation", confirmed:"Confirmed Cheater",
+    totalReport:"Total Reports", totalCheater:"Total Cheater", totalClean:"Total Clean",
+    search:"Search UID/Name"
+  }
+};
+
+// ---------- REPORT DATA ----------
+let reports = JSON.parse(localStorage.getItem("reports")||"[]");
+let currentUser = null;
+
+// ---------- LANGUAGE FUNCTION ----------
+function setLang(l){
+  lang = l;
+  localStorage.setItem("lang",l);
+  document.getElementById("loginTitle").innerText = text[l].login;
+  document.getElementById("reportTitle").innerText = text[l].report;
+  document.getElementById("allReportsTitle").innerText = text[l].allReports;
+  document.getElementById("logoutBtn")?.innerText = text[l].logout;
+  document.getElementById("adminLogout")?.innerText = text[l].logout;
+}
+setLang(lang);
+
+// ---------- LOGIN ----------
+function login(){
+  let e=document.getElementById("email").value;
+  let p=document.getElementById("password").value;
+  if(!users[e] || users[e].pass!==p){alert("Login gagal"); return;}
+  currentUser = {email:e, role:users[e].role};
+  document.getElementById("loginPage").classList.add("hidden");
+  if(users[e].role=="admin"){ 
+    document.getElementById("adminPage").classList.remove("hidden"); 
+    loadAdminReports();
+  } else { 
+    document.getElementById("userPage").classList.remove("hidden"); 
+    loadReports();
+  }
+}
+
+// ---------- LOGOUT ----------
+function logout(){ location.reload(); }
+
+// ---------- SUBMIT REPORT ----------
+function submitReport(){
+  let uid=document.getElementById("uid").value;
+  let name=document.getElementById("pname").value;
+  let cheat=document.getElementById("cheat").value;
+  let proof=document.getElementById("proof").value;
+  if(!uid || !name){alert("Sila isi UID dan Nama"); return;}
+  reports.push({uid,name,cheat,proof,status:"Under Investigation"});
+  localStorage.setItem("reports",JSON.stringify(reports));
+  document.getElementById("uid").value=""; document.getElementById("pname").value=""; document.getElementById("proof").value="";
+  loadReports();
+  loadAdminReports();
+}
+
+// ---------- LOAD REPORTS FOR USER ----------
+function loadReports(){
+  let html=`<table>
+  <tr><th>UID</th><th>Nama</th><th>Cheat</th><th>Bukti</th><th>Status</th></tr>`;
+  reports.forEach(r=>{
+    let color = r.status=="Under Investigation"?"orange":r.status=="Confirmed Cheater"?"red":"green";
+    html+=`<tr>
+      <td>${r.uid}</td>
+      <td>${r.name}</td>
+      <td>${r.cheat}</td>
+      <td><a href="${r.proof}" target="_blank">View</a></td>
+      <td><span class="badge ${color}">${r.status}</span></td>
+    </tr>`;
+  });
+  html+="</table>";
+  document.getElementById("reportList").innerHTML=html;
+}
+
+// ---------- LOAD REPORTS FOR ADMIN ----------
+function loadAdminReports(){
+  let total = reports.length;
+  let cheater = reports.filter(r=>r.status=="Confirmed Cheater").length;
+  let clean = reports.filter(r=>r.status=="Clean").length;
+  document.getElementById("totalReports").innerText = total;
+  document.getElementById("totalCheater").innerText = cheater;
+  document.getElementById("totalClean").innerText = clean;
+
+  let html=`<table>
+  <tr><th>UID</th><th>Nama</th><th>Cheat</th><th>Bukti</th><th>Status</th><th>Action</th></tr>`;
+  reports.forEach((r,i)=>{
+    let color = r.status=="Under Investigation"?"orange":r.status=="Confirmed Cheater"?"red":"green";
+    html+=`<tr>
+      <td>${r.uid}</td>
+      <td>${r.name}</td>
+      <td>${r.cheat}</td>
+      <td><a href="${r.proof}" target="_blank">View</a></td>
+      <td><span class="badge ${color}">${r.status}</span></td>
+      <td>
+        <button onclick="approve(${i})">Confirm Cheater</button>
+        <button onclick="reject(${i})">Mark Clean</button>
+      </td>
+    </tr>`;
+  });
+  html+="</table>";
+  document.getElementById("adminReports").innerHTML=html;
+}
+
+// ---------- ADMIN ACTIONS ----------
+function approve(i){ reports[i].status="Confirmed Cheater"; localStorage.setItem("reports",JSON.stringify(reports)); loadReports(); loadAdminReports(); }
+function reject(i){ reports[i].status="Clean"; localStorage.setItem("reports",JSON.stringify(reports)); loadReports(); loadAdminReports(); }
+
+// ---------- SEARCH/FILTER ----------
+function filterReports(){
+  let val = document.getElementById("searchInput").value.toLowerCase();
+  let filtered = reports.filter(r=>r.uid.toLowerCase().includes(val) || r.name.toLowerCase().includes(val));
+  let html=`<table>
+  <tr><th>UID</th><th>Nama</th><th>Cheat</th><th>Bukti</th><th>Status</th></tr>`;
+  filtered.forEach(r=>{
+    let color = r.status=="Under Investigation"?"orange":r.status=="Confirmed Cheater"?"red":"green";
+    html+=`<tr>
+      <td>${r.uid}</td><td>${r.name}</td><td>${r.cheat}</td>
+      <td><a href="${r.proof}" target="_blank">View</a></td>
+      <td><span class="badge ${color}">${r.status}</span></td>
+    </tr>`;
+  });
+  html+="</table>";
+  document.getElementById("reportList").innerHTML=html;
+}
+
+function filterAdminReports(){
+  let val = document.getElementById("searchAdmin").value.toLowerCase();
+  let filtered = reports.filter(r=>r.uid.toLowerCase().includes(val) || r.name.toLowerCase().includes(val));
+  let html=`<table>
+  <tr><th>UID</th><th>Nama</th><th>Cheat</th><th>Bukti</th><th>Status</th><th>Action</th></tr>`;
+  filtered.forEach((r,i)=>{
+    let color = r.status=="Under Investigation"?"orange":r.status=="Confirmed Cheater"?"red":"green";
+    html+=`<tr>
+      <td>${r.uid}</td><td>${r.name}</td><td>${r.cheat}</td>
+      <td><a href="${r.proof}" target="_blank">View</a></td>
+      <td><span class="badge ${color}">${r.status}</span></td>
+      <td>
+        <button onclick="approve(${i})">Confirm Cheater</button>
+        <button onclick="reject(${i})">Mark Clean</button>
+      </td>
+    </tr>`;
+  });
+  html+="</table>";
+  document.getElementById("adminReports").innerHTML=html;
+}
+</script>
+</body>
+</html>
